@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, Switch, Space, Popconfirm, message, Tag, Transfer } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, DatePicker, Switch, Space, Popconfirm, message, Tag, Transfer, Typography, Tooltip, Badge } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CalendarOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { SurveyListItem, Question, User, Survey, CreateSurveyRequest } from '../../types';
 import { surveyService } from '../../services/surveyService';
 import { questionService } from '../../services/questionService';
 
 const { RangePicker } = DatePicker;
+const { Title } = Typography;
 
 export default function Surveys() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
@@ -31,7 +32,7 @@ export default function Surveys() {
       setQuestions(q);
       setUsers(u.filter(u => u.role === 'User'));
     } catch {
-      message.error('Failed to load data');
+      message.error('Veriler yuklenemedi');
     } finally {
       setLoading(false);
     }
@@ -65,7 +66,7 @@ export default function Surveys() {
     try {
       const values = await form.validateFields();
       if (selectedQuestionIds.length === 0) {
-        message.error('Please select at least one question');
+        message.error('En az bir soru secmelisiniz');
         return;
       }
       const request: CreateSurveyRequest = {
@@ -83,10 +84,10 @@ export default function Surveys() {
 
       if (editing) {
         await surveyService.update(editing.id, request);
-        message.success('Survey updated');
+        message.success('Anket guncellendi');
       } else {
         await surveyService.create(request);
-        message.success('Survey created');
+        message.success('Anket olusturuldu');
       }
       setModalOpen(false);
       fetchData();
@@ -98,38 +99,70 @@ export default function Surveys() {
   const handleDelete = async (id: number) => {
     try {
       await surveyService.delete(id);
-      message.success('Survey deleted');
+      message.success('Anket silindi');
       fetchData();
     } catch {
-      message.error('Failed to delete survey');
+      message.error('Anket silinemedi');
     }
   };
 
   const columns = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Title', dataIndex: 'title', key: 'title' },
+    { title: '#', dataIndex: 'id', key: 'id', width: 60 },
     {
-      title: 'Date Range',
+      title: 'Anket Basligi',
+      dataIndex: 'title',
+      key: 'title',
+      render: (text: string) => <strong>{text}</strong>,
+    },
+    {
+      title: 'Tarih Araligi',
       key: 'dates',
-      render: (_: any, r: SurveyListItem) =>
-        `${dayjs(r.startDate).format('YYYY-MM-DD')} ~ ${dayjs(r.endDate).format('YYYY-MM-DD')}`,
+      width: 220,
+      render: (_: any, r: SurveyListItem) => (
+        <Space>
+          <CalendarOutlined style={{ color: '#8c8c8c' }} />
+          <span>{dayjs(r.startDate).format('DD.MM.YYYY')} - {dayjs(r.endDate).format('DD.MM.YYYY')}</span>
+        </Space>
+      ),
     },
     {
-      title: 'Status',
+      title: 'Durum',
       key: 'status',
-      render: (_: any, r: SurveyListItem) =>
-        <Tag color={r.isActive ? 'green' : 'red'}>{r.isActive ? 'Active' : 'Inactive'}</Tag>,
+      width: 100,
+      align: 'center' as const,
+      render: (_: any, r: SurveyListItem) => (
+        <Badge status={r.isActive ? 'success' : 'error'} text={r.isActive ? 'Aktif' : 'Pasif'} />
+      ),
     },
-    { title: 'Questions', dataIndex: 'questionCount', key: 'qcount' },
-    { title: 'Assigned Users', dataIndex: 'assignedUserCount', key: 'ucount' },
     {
-      title: 'Actions',
+      title: 'Sorular',
+      dataIndex: 'questionCount',
+      key: 'qcount',
+      width: 90,
+      align: 'center' as const,
+      render: (v: number) => <Tag>{v}</Tag>,
+    },
+    {
+      title: 'Kullanicilar',
+      dataIndex: 'assignedUserCount',
+      key: 'ucount',
+      width: 110,
+      align: 'center' as const,
+      render: (v: number) => <Tag icon={<UserOutlined />}>{v}</Tag>,
+    },
+    {
+      title: 'Islemler',
       key: 'actions',
+      width: 120,
       render: (_: any, record: SurveyListItem) => (
         <Space>
-          <Button icon={<EditOutlined />} onClick={() => openModal(record)} size="small">Edit</Button>
-          <Popconfirm title="Delete this survey?" onConfirm={() => handleDelete(record.id)}>
-            <Button icon={<DeleteOutlined />} danger size="small">Delete</Button>
+          <Tooltip title="Duzenle">
+            <Button icon={<EditOutlined />} onClick={() => openModal(record)} size="small" type="text" />
+          </Tooltip>
+          <Popconfirm title="Bu anketi silmek istediginizden emin misiniz?" okText="Evet" cancelText="Hayir" onConfirm={() => handleDelete(record.id)}>
+            <Tooltip title="Sil">
+              <Button icon={<DeleteOutlined />} danger size="small" type="text" />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -138,51 +171,70 @@ export default function Surveys() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2>Surveys</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>New Survey</Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <Title level={4} style={{ margin: 0 }}>Anketler</Title>
+          <span style={{ color: '#8c8c8c' }}>Anketleri olusturun, duzenleyin ve kullanicilara atayin</span>
+        </div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size="large"
+          style={{ borderRadius: 8, background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)', border: 'none' }}>
+          Yeni Anket
+        </Button>
       </div>
-      <Table dataSource={surveys} columns={columns} rowKey="id" loading={loading} />
+      <Table
+        dataSource={surveys}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        bordered
+        style={{ borderRadius: 8, overflow: 'hidden' }}
+        pagination={{ pageSize: 10, showTotal: (total) => `Toplam ${total} anket` }}
+      />
 
       <Modal
-        title={editing ? 'Edit Survey' : 'New Survey'}
+        title={editing ? 'Anketi Duzenle' : 'Yeni Anket Olustur'}
         open={modalOpen}
         onOk={handleSave}
         onCancel={() => setModalOpen(false)}
-        width={700}
+        okText="Kaydet"
+        cancelText="Iptal"
+        width={720}
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="title" label="Title" rules={[{ required: true }]}>
-            <Input />
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="title" label="Anket Basligi" rules={[{ required: true, message: 'Baslik gerekli' }]}>
+            <Input placeholder="Anket basligini girin" />
           </Form.Item>
-          <Form.Item name="description" label="Description">
-            <Input.TextArea rows={3} />
+          <Form.Item name="description" label="Aciklama">
+            <Input.TextArea rows={3} placeholder="Anket aciklamasi (opsiyonel)" />
           </Form.Item>
-          <Form.Item name="dateRange" label="Date Range" rules={[{ required: true }]}>
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="isActive" label="Active" valuePropName="checked">
-            <Switch />
-          </Form.Item>
+          <Space size="large" style={{ width: '100%' }}>
+            <Form.Item name="dateRange" label="Tarih Araligi" rules={[{ required: true, message: 'Tarih secimi gerekli' }]}>
+              <RangePicker format="DD.MM.YYYY" />
+            </Form.Item>
+            <Form.Item name="isActive" label="Durum" valuePropName="checked">
+              <Switch checkedChildren="Aktif" unCheckedChildren="Pasif" />
+            </Form.Item>
+          </Space>
 
-          <Form.Item label="Select Questions">
+          <Form.Item label="Sorulari Secin">
             <Transfer
               dataSource={questions.map(q => ({ key: String(q.id), title: q.text }))}
-              titles={['Available', 'Selected']}
+              titles={['Mevcut Sorular', 'Secilen Sorular']}
               targetKeys={selectedQuestionIds}
               onChange={(keys) => setSelectedQuestionIds(keys as string[])}
               render={item => item.title || ''}
-              listStyle={{ width: 280, height: 300 }}
+              listStyle={{ width: 300, height: 250 }}
             />
           </Form.Item>
 
-          <Form.Item label="Assign Users">
+          <Form.Item label="Kullanicilari Ata">
             <Select
               mode="multiple"
-              placeholder="Select users to assign"
+              placeholder="Anketi dolduracak kullanicilari secin"
               value={selectedUserIds.map(Number)}
               onChange={(vals: number[]) => setSelectedUserIds(vals.map(String))}
               style={{ width: '100%' }}
+              size="large"
             >
               {users.map(u => (
                 <Select.Option key={u.id} value={u.id}>
