@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Veritabanı
+  db:
+    image: postgres:17-alpine
+    container_name: surveyapp-db
+    environment:
+      POSTGRES_DB: SurveyAppDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # .NET Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: surveyapp-backend
+    ports:
+      - "5021:5021"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SurveyAppDb;Username=postgres;Password=postgres
+      - Jwt__Key=SurveyAppSecretKey2024VeryLongKeyForSecurity!@#$%
+      - Jwt__Issuer=SurveyApp
+      - Jwt__Audience=SurveyAppUsers
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # React Frontend (nginx ile serve)
+  frontend:
+    build:
+      context: ./frontend/survey-app
+      dockerfile: Dockerfile
+    container_name: surveyapp-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

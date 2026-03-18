@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "K6stsWZuo+k=",
+  "success": true,
+  "projectFilePath": "/Users/muhammedalibalci/SurveyApp/backend/src/SurveyApp.Application/SurveyApp.Application.csproj",
+  "expectedPackageFiles": [
+    "/Users/muhammedalibalci/.nuget/packages/bcrypt.net-next/4.0.3/bcrypt.net-next.4.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}
