@@ -26,8 +26,8 @@ export default function AdminLayout() {
     { key: '/admin/reports', icon: <BarChartOutlined />, label: 'Raporlar' },
   ];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

@@ -5,11 +5,6 @@ export interface User {
   role: string;
 }
 
-export interface AuthResponse {
-  token: string;
-  user: User;
-}
-
 export interface AnswerOption {
   id: number;
   text: string;
