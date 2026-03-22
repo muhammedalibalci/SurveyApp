@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SurveyApp.Application.DTOs;
@@ -11,60 +12,54 @@ namespace SurveyApp.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IValidator<LoginRequest> _loginValidator;
+    private readonly IValidator<RegisterRequest> _registerValidator;
 
-    public AuthController(IAuthService authService)
+    public AuthController(
+        IAuthService authService,
+        IValidator<LoginRequest> loginValidator,
+        IValidator<RegisterRequest> registerValidator)
     {
         _authService = authService;
+        _loginValidator = loginValidator;
+        _registerValidator = registerValidator;
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        try
-        {
-            var result = await _authService.LoginAsync(request);
+        var validation = await _loginValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
 
-            // JWT token'i HttpOnly cookie olarak set et
-            SetTokenCookie(result.Token);
-
-            // Response body'de token donme, sadece user bilgisi don
-            return Ok(result.User);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
+        var result = await _authService.LoginAsync(request);
+        SetTokenCookie(result.Token);
+        return Ok(result.User);
     }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        try
-        {
-            var result = await _authService.RegisterAsync(request);
+        var validation = await _registerValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
 
-            SetTokenCookie(result.Token);
-
-            return Ok(result.User);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var result = await _authService.RegisterAsync(request);
+        SetTokenCookie(result.Token);
+        return Ok(result.User);
     }
 
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        // Cookie'yi sil
         Response.Cookies.Append("access_token", "", new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTimeOffset.UtcNow.AddDays(-1)
+            Secure = false,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddDays(-1),
+            Path = "/"
         });
-
         return Ok(new { message = "Logged out" });
     }
 
@@ -72,7 +67,6 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult Me()
     {
-        // Cookie'deki token gecerliyse kullanici bilgisini don
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
         var name = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -93,9 +87,9 @@ public class AuthController : ControllerBase
     {
         Response.Cookies.Append("access_token", token, new CookieOptions
         {
-            HttpOnly = true,          // JS erisilemez
-            Secure = false,            // Development icin false, production'da true
-            SameSite = SameSiteMode.Lax, // CSRF korunmasi
+            HttpOnly = true,
+            Secure = false,
+            SameSite = SameSiteMode.Lax,
             Expires = DateTimeOffset.UtcNow.AddHours(24),
             Path = "/"
         });

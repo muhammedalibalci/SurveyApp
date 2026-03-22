@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SurveyApp.Application.DTOs;
@@ -11,18 +12,17 @@ namespace SurveyApp.API.Controllers;
 public class QuestionsController : ControllerBase
 {
     private readonly IQuestionService _service;
+    private readonly IValidator<CreateQuestionRequest> _validator;
 
-    public QuestionsController(IQuestionService service)
+    public QuestionsController(IQuestionService service, IValidator<CreateQuestionRequest> validator)
     {
         _service = service;
+        _validator = validator;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
-    {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
-    }
+        => Ok(await _service.GetAllAsync());
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
@@ -34,6 +34,10 @@ public class QuestionsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateQuestionRequest request)
     {
+        var validation = await _validator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
         var result = await _service.CreateAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
@@ -41,6 +45,10 @@ public class QuestionsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] CreateQuestionRequest request)
     {
+        var validation = await _validator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
         await _service.UpdateAsync(id, request);
         return NoContent();
     }

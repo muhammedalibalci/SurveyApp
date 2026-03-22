@@ -5,6 +5,7 @@ namespace SurveyApp.Application.Services.Interfaces;
 public interface ISurveyService
 {
     Task<List<SurveyListDto>> GetAllAsync();
+    Task<PagedResult<SurveyListDto>> GetPagedAsync(PaginationParams paginationParams);
     Task<SurveyDto?> GetByIdAsync(int id);
     Task<SurveyDto> CreateAsync(CreateSurveyRequest request);
     Task UpdateAsync(int id, CreateSurveyRequest request);

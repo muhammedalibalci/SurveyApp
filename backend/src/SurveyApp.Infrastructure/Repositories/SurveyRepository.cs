@@ -21,6 +21,27 @@ public class SurveyRepository : ISurveyRepository
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync();
 
+    public async Task<(List<Survey> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null)
+    {
+        var query = _context.Surveys
+            .Include(s => s.SurveyQuestions).ThenInclude(sq => sq.Question)
+            .Include(s => s.SurveyAssignments).ThenInclude(sa => sa.User)
+            .Include(s => s.SurveyResponses)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(s => s.Title.ToLower().Contains(search.ToLower()));
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(s => s.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
     public async Task<Survey?> GetByIdAsync(int id)
         => await _context.Surveys
             .Include(s => s.SurveyQuestions.OrderBy(sq => sq.Order))

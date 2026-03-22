@@ -10,8 +10,24 @@ using SurveyApp.Infrastructure.Repositories;
 using SurveyApp.Infrastructure.Services;
 using SurveyApp.Core.Entities;
 using Microsoft.OpenApi.Models;
+using FluentValidation;
+using Serilog;
+using SurveyApp.API.Middleware;
+
+// Serilog yapilandirmasi
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File("logs/surveyapp-.log",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {SourceContext} | {Message:lj}{NewLine}{Exception}")
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 // Database (PostgreSQL)
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -84,6 +100,9 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 
+// FluentValidation — Application katmanindaki tum validator'lari otomatik kaydet
+builder.Services.AddValidatorsFromAssemblyContaining<SurveyApp.Application.Validators.LoginRequestValidator>();
+
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -142,8 +161,19 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Global exception handling middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Serilog HTTP request logging
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "{RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
+});
+
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+Log.Information("Survey App API started successfully");
 app.Run();

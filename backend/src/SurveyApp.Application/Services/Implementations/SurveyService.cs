@@ -31,6 +31,32 @@ public class SurveyService : ISurveyService
         }).ToList();
     }
 
+    public async Task<PagedResult<SurveyListDto>> GetPagedAsync(PaginationParams paginationParams)
+    {
+        var (items, totalCount) = await _repository.GetPagedAsync(
+            paginationParams.Page, paginationParams.PageSize, paginationParams.Search);
+
+        return new PagedResult<SurveyListDto>
+        {
+            Items = items.Select(s => new SurveyListDto
+            {
+                Id = s.Id,
+                Title = s.Title,
+                Description = s.Description,
+                StartDate = s.StartDate,
+                EndDate = s.EndDate,
+                IsActive = s.IsActive,
+                QuestionCount = s.SurveyQuestions.Count,
+                AssignedUserCount = s.SurveyAssignments.Count,
+                ResponseCount = s.SurveyResponses.Count,
+                CreatedAt = s.CreatedAt
+            }).ToList(),
+            TotalCount = totalCount,
+            Page = paginationParams.Page,
+            PageSize = paginationParams.PageSize
+        };
+    }
+
     public async Task<SurveyDto?> GetByIdAsync(int id)
     {
         var survey = await _repository.GetByIdAsync(id);

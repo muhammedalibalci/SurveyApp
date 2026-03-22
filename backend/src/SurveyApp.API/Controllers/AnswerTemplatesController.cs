@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SurveyApp.Application.DTOs;
@@ -11,18 +12,17 @@ namespace SurveyApp.API.Controllers;
 public class AnswerTemplatesController : ControllerBase
 {
     private readonly IAnswerTemplateService _service;
+    private readonly IValidator<CreateAnswerTemplateRequest> _validator;
 
-    public AnswerTemplatesController(IAnswerTemplateService service)
+    public AnswerTemplatesController(IAnswerTemplateService service, IValidator<CreateAnswerTemplateRequest> validator)
     {
         _service = service;
+        _validator = validator;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
-    {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
-    }
+        => Ok(await _service.GetAllAsync());
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
@@ -34,29 +34,23 @@ public class AnswerTemplatesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateAnswerTemplateRequest request)
     {
-        try
-        {
-            var result = await _service.CreateAsync(request);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var validation = await _validator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
+        var result = await _service.CreateAsync(request);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] CreateAnswerTemplateRequest request)
     {
-        try
-        {
-            await _service.UpdateAsync(id, request);
-            return NoContent();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var validation = await _validator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
+        await _service.UpdateAsync(id, request);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]

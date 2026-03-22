@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SurveyApp.Application.DTOs;
@@ -13,21 +14,30 @@ public class SurveysController : ControllerBase
 {
     private readonly ISurveyService _service;
     private readonly ISurveyResponseService _responseService;
+    private readonly IValidator<CreateSurveyRequest> _surveyValidator;
+    private readonly IValidator<SubmitSurveyRequest> _submitValidator;
 
-    public SurveysController(ISurveyService service, ISurveyResponseService responseService)
+    public SurveysController(
+        ISurveyService service,
+        ISurveyResponseService responseService,
+        IValidator<CreateSurveyRequest> surveyValidator,
+        IValidator<SubmitSurveyRequest> submitValidator)
     {
         _service = service;
         _responseService = responseService;
+        _surveyValidator = surveyValidator;
+        _submitValidator = submitValidator;
     }
 
-    // Admin endpoints
     [HttpGet]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll()
-    {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
-    }
+        => Ok(await _service.GetAllAsync());
+
+    [HttpGet("paged")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetPaged([FromQuery] PaginationParams paginationParams)
+        => Ok(await _service.GetPagedAsync(paginationParams));
 
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin")]
@@ -41,6 +51,10 @@ public class SurveysController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateSurveyRequest request)
     {
+        var validation = await _surveyValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
         var result = await _service.CreateAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
@@ -49,6 +63,10 @@ public class SurveysController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] CreateSurveyRequest request)
     {
+        var validation = await _surveyValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
         await _service.UpdateAsync(id, request);
         return NoContent();
     }
@@ -69,22 +87,16 @@ public class SurveysController : ControllerBase
         return result == null ? NotFound() : Ok(result);
     }
 
-    // User endpoints
     [HttpGet("my")]
     [Authorize(Roles = "User")]
     public async Task<IActionResult> GetMySurveys()
-    {
-        var userId = GetUserId();
-        var result = await _service.GetUserSurveysAsync(userId);
-        return Ok(result);
-    }
+        => Ok(await _service.GetUserSurveysAsync(GetUserId()));
 
     [HttpGet("{id}/answer")]
     [Authorize(Roles = "User")]
     public async Task<IActionResult> GetSurveyForAnswering(int id)
     {
-        var userId = GetUserId();
-        var result = await _service.GetSurveyForAnsweringAsync(id, userId);
+        var result = await _service.GetSurveyForAnsweringAsync(id, GetUserId());
         return result == null ? NotFound() : Ok(result);
     }
 
@@ -92,25 +104,14 @@ public class SurveysController : ControllerBase
     [Authorize(Roles = "User")]
     public async Task<IActionResult> Submit([FromBody] SubmitSurveyRequest request)
     {
-        try
-        {
-            var userId = GetUserId();
-            await _responseService.SubmitAsync(userId, request);
-            return Ok(new { message = "Survey submitted successfully." });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Forbid(ex.Message);
-        }
+        var validation = await _submitValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+            return BadRequest(new { message = validation.Errors.First().ErrorMessage });
+
+        await _responseService.SubmitAsync(GetUserId(), request);
+        return Ok(new { message = "Anket basariyla gonderildi." });
     }
 
     private int GetUserId()
-    {
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return int.Parse(claim!.Value);
-    }
+        => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 }
